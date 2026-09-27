@@ -1,5 +1,6 @@
 import shutil  # 用于复制文件
 import tempfile  # 用于创建临时文件（可选）
+import pyglet #字体导入
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -13,6 +14,8 @@ import threading
 
 # -------------------------- 全局配置 --------------------------
 # 字段定义（按需求排序，标注必填项）
+pyglet.font.add_file("./SarasaUiSC-Regular.ttf")  # 更纱黑体 UI SC Regular
+pyglet.font.load("./SarasaUiSC-Regular.ttf")
 FIELDS = [
     ("证书编号", "required"), ("送检班组", "required"), ("样品名称", "required"),
     ("生产厂商", "optional"), ("型号", "optional"), ("样品编号", "optional"),
@@ -33,9 +36,9 @@ FIELDS = [
 
             
 # 文件路径
-EXCEL_PATH = os.path.join(os.path.expanduser("~"), "Desktop", "设备校验数据.xlsx")
-TEMPLATE_DEFAULT_PATH = os.path.join(os.path.expanduser("~"), "Desktop", "template.docx")
-EXPORT_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "导出Word文档")
+EXCEL_PATH = os.path.join(os.path.expanduser("~"), "gitLib", "CalibrationDataManagementSystem", "设备校验数据.xlsx")
+TEMPLATE_DEFAULT_PATH = os.path.join(os.path.expanduser("~"), "gitLib", "CalibrationDataManagementSystem", "template.docx")
+EXPORT_DIR = os.path.join(os.path.expanduser("~"), "gitLib", "CalibrationDataManagementSystem", "导出Word文档")
 
 # -------------------------- 自定义组件 --------------------------
 class PlaceholderEntry(ttk.Entry):
@@ -585,6 +588,6 @@ class DeviceCheckApp:
 if __name__ == "__main__":
     # 解决Tkinter中文显示问题
     root = tk.Tk()
-    root.option_add("*Font", "SimHei 9")
+    root.option_add("*Font", "Sarasa-UI-SC 9")
     app = DeviceCheckApp(root)
     root.mainloop()
