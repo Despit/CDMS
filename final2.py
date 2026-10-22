@@ -1,8 +1,8 @@
 import shutil  # 用于复制文件
 import tempfile  # 用于创建临时文件（可选）
-import pyglet #字体导入
 
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
 import openpyxl
 import os
@@ -14,8 +14,7 @@ import threading
 
 # -------------------------- 全局配置 --------------------------
 # 字段定义（按需求排序，标注必填项）
-pyglet.font.add_file("./SarasaUiSC-Regular.ttf")  # 更纱黑体 UI SC Regular
-pyglet.font.load("./SarasaUiSC-Regular.ttf")
+
 FIELDS = [
     ("证书编号", "required"), ("送检班组", "required"), ("样品名称", "required"),
     ("生产厂商", "optional"), ("型号", "optional"), ("样品编号", "optional"),
@@ -348,9 +347,10 @@ def export_selected_data(selected_rows):
 class DeviceCheckApp:
     def __init__(self, root):
         self.root = root
+        tkFont=tkfont.Font(family="更纱黑体 UI SC", size=9)
+        root.option_add("*Font", tkFont)
         self.root.title("设备校验数据收集系统")
-        self.root.geometry("1500x800")
-        self.root.minsize(1000, 600)
+        self.root.geometry("1920x1080")
 
         # 变量初始化
         self.current_edit_row = None  # 当前编辑的行号
@@ -361,8 +361,8 @@ class DeviceCheckApp:
 
         # 样式配置
         self.style = ttk.Style()
-        self.style.configure("Treeview.Heading", font=("SimHei", 9, "bold"))
-        self.style.configure("Treeview", font=("SimHei", 9), rowheight=25)
+        self.style.configure("Treeview.Heading", font=("更纱黑体 UI SC", 9, "bold"))
+        self.style.configure("Treeview", font=("更纱黑体 UI SC", 9), rowheight=25)
         # 新增：占位符样式（灰色文字）
         self.style.configure("Placeholder.TEntry", foreground="#999999")
 
@@ -371,19 +371,19 @@ class DeviceCheckApp:
         self.paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # 1. 左侧录入面板
-        self.input_frame = ttk.LabelFrame(self.paned, text="数据录入", padding=10)
+        self.input_frame = ttk.LabelFrame(self.paned, text="数据录入", padding=10,width=10)
         self.paned.add(self.input_frame, weight=1)
         self.create_input_form()
 
         # 2. 右侧数据面板
-        self.data_frame = ttk.LabelFrame(self.paned, text="历史数据", padding=10)
+        self.data_frame = ttk.LabelFrame(self.paned, text="历史数据", padding=10,width=10)
         self.paned.add(self.data_frame, weight=3)
         self.create_data_table()
 
     def create_input_form(self):
         """创建数据录入表单（优化布局）"""
         # 滚动容器（适配多字段）
-        canvas = tk.Canvas(self.input_frame, bg="black")
+        canvas = tk.Canvas(self.input_frame, bg="#999999")
         scroll_y = ttk.Scrollbar(self.input_frame, orient=tk.VERTICAL, command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
         scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
@@ -588,6 +588,5 @@ class DeviceCheckApp:
 if __name__ == "__main__":
     # 解决Tkinter中文显示问题
     root = tk.Tk()
-    root.option_add("*Font", "Sarasa-UI-SC 9")
     app = DeviceCheckApp(root)
     root.mainloop()
