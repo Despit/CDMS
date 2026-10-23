@@ -12,3 +12,7 @@
 1. 上云
 2. 流程审批
 3. 网页端
+
+### 运行模式
+- 默认使用 MySQL 数据库；设置环境变量 `LOCAL_MODE=1` 可切换为本地 Excel 模式。
+- 数据库连接参数通过 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_PASSWORD` 和 `MYSQL_DATABASE` 配置。
