@@ -1,6 +1,3 @@
-import shutil  # 用于复制文件
-import tempfile  # 用于创建临时文件（可选）
-
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
@@ -8,13 +5,13 @@ from calendar import monthrange
 import openpyxl
 import os
 import re
+import sys
 import statistics
 import threading
 import time
 from datetime import date, datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from docx import Document
-from docx.shared import Inches
 
 import mysql.connector
 from mysql.connector import Error
@@ -163,7 +160,11 @@ def calculate_reference_data(input_range, output_range, measured_values):
         errors.append(f"{error_value:.4f}")
         numeric_errors.append(error_value)
 
-    max_error = f"{max(abs(error) for error in numeric_errors):.4f}" if numeric_errors else ""
+    max_error = (
+        f"{max(abs(error) for error in numeric_errors):.4f}"
+        if len(numeric_errors) == 11
+        else ""
+    )
     return {
         "reference_inputs": reference_inputs,
         "reference_outputs": reference_outputs,
@@ -234,10 +235,13 @@ def database_row_date_highlights(row, today=None):
     return highlights
 
             
-# 文件路径
-EXCEL_PATH = os.path.join(os.path.expanduser("~"), "gitLib", "CalibrationDataManagementSystem", "设备校验数据.xlsx")
-TEMPLATE_DEFAULT_PATH = os.path.join(os.path.expanduser("~"), "gitLib", "CalibrationDataManagementSystem", "template.docx")
-EXPORT_DIR = os.path.join(os.path.expanduser("~"), "gitLib", "CalibrationDataManagementSystem", "导出Word文档")
+# 文件路径：打包时以可执行文件所在目录为基准，源码运行时以脚本目录为基准。
+APPLICATION_DIR = os.path.dirname(
+    os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__)
+)
+EXCEL_PATH = os.path.join(APPLICATION_DIR, "设备校验数据.xlsx")
+TEMPLATE_DEFAULT_PATH = os.path.join(APPLICATION_DIR, "template.docx")
+EXPORT_DIR = os.path.join(APPLICATION_DIR, "导出Word文档")
 
 # -------------------------- 自定义组件 --------------------------
 class PlaceholderEntry(ttk.Entry):
@@ -982,35 +986,23 @@ def format_word_date(value):
                     
 def export_single_data(row_data, headers, template_path, export_path):
     """导出单条数据（保留格式+不修改原始模板）"""
+    certificate_no = "未知"
     try:
-        # 1. 创建临时模板副本（避免修改原始模板）
-        temp_template = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
-        shutil.copy2(template_path, temp_template.name)  # 保留文件元数据和格式
-        temp_template.close()
-        
-        # 2. 打开临时副本（只读模式避免格式损坏）
-        doc = Document(temp_template.name)
+        certificate_index = headers.index("证书编号")
+        if certificate_index < len(row_data) and row_data[certificate_index]:
+            certificate_no = str(row_data[certificate_index])
+        doc = Document(template_path)
         export_row = list(row_data)
         for field in ("校验日期", "有效日期"):
             if field in headers:
                 index = headers.index(field)
                 export_row[index] = format_word_date(export_row[index])
         data_dict = build_word_data_dict(export_row, headers)
-        
-        # 3. 替换占位符（保留所有格式）
         replace_placeholder(doc, data_dict)
-        
-        # 4. 保存到目标路径（禁用格式自动修正）
         doc.save(export_path)
-        
-        # 5. 清理临时文件
-        os.unlink(temp_template.name)
         return True, data_dict["证书编号"]
-    except Exception as e:
-        # 异常时清理临时文件
-        if 'temp_template' in locals() and os.path.exists(temp_template.name):
-            os.unlink(temp_template.name)
-        return False, f"{data_dict.get('证书编号', '未知')}：{str(e)}"
+    except Exception as error:
+        return False, f"{certificate_no}：{error}"
 
 def export_selected_data(selected_data, headers, template_path):
     """将传入的选中记录导出到 Word，不依赖数据来自 Excel 还是数据库。"""
@@ -1019,7 +1011,11 @@ def export_selected_data(selected_data, headers, template_path):
     fail_info = []
     for row_data in selected_data:
         cert_no = row_data[FIELD_INDEX["证书编号"]]
-        file_name = f"设备校验报告_{cert_no}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.docx"
+        safe_cert_no = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(cert_no)).rstrip(" .")
+        file_name = (
+            f"设备校验报告_{safe_cert_no}_"
+            f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}.docx"
+        )
         export_path = os.path.join(EXPORT_DIR, file_name)
         result, message = export_single_data(row_data, headers, template_path, export_path)
         if result:
@@ -1039,7 +1035,6 @@ class DeviceCheckApp:
 
         # 变量初始化
         self.current_edit_row = None  # 当前编辑的行号
-        self.current_edit_cert_no = None
         self.current_edit_primary_key = None
         self.selected_items = []      # 选中的行ID
         self._last_operated_key = None
@@ -2023,7 +2018,6 @@ class DeviceCheckApp:
             )
             messagebox.showinfo("成功", f"数据{action}成功！")
             self.current_edit_row = None
-            self.current_edit_cert_no = None
             self.current_edit_primary_key = None
             if not is_editing:
                 self.current_page = 0
@@ -2046,7 +2040,6 @@ class DeviceCheckApp:
             self._set_last_operated_key(operated_key)
         messagebox.showinfo("成功", f"数据{action}成功！")
         self.current_edit_row = None
-        self.current_edit_cert_no = None
         self.current_edit_primary_key = None
         if not is_editing:
             self.current_page = 0
@@ -2061,7 +2054,6 @@ class DeviceCheckApp:
     def cancel_edit(self):
         """取消编辑"""
         self.current_edit_row = None
-        self.current_edit_cert_no = None
         self.current_edit_primary_key = None
         self.clear_form()
 
@@ -2104,8 +2096,11 @@ class DeviceCheckApp:
                 (excel_row, row)
                 for excel_row, row in enumerate(self.all_table_data[1:], start=2)
                 if not self.search_keyword
-                or self.search_keyword.lower() in row[0].lower()
-                or self.search_keyword.lower() in row[2].lower()
+                or self.search_keyword.casefold()
+                in row[FIELD_INDEX["证书编号"]].casefold()
+                or self.search_keyword.casefold()
+                in row[FIELD_INDEX["样品名称"]].casefold()
+                or self.search_keyword == row[FIELD_INDEX["样品状态"]]
             ]
             total_pages = max(1, (len(rows) + self.page_size - 1) // self.page_size)
             self.current_page = min(self.current_page, total_pages - 1)
@@ -2161,7 +2156,6 @@ class DeviceCheckApp:
             data_dict = dict(zip([field[0] for field in FIELDS], row_data))
             self.fill_form(data_dict)
             self.current_edit_row = self._tree_row_positions[selected_item]
-            self.current_edit_cert_no = None
             self.current_edit_primary_key = None
             return
 
@@ -2195,7 +2189,6 @@ class DeviceCheckApp:
         data_dict = dict(zip([field[0] for field in FIELDS], row))
         self.fill_form(data_dict)
         self.current_edit_row = self.tree.index(item) + 2
-        self.current_edit_cert_no = data_dict["证书编号"]
         self.current_edit_primary_key = primary_key
         self._mark_last_operated_item(item)
 
@@ -2209,12 +2202,6 @@ class DeviceCheckApp:
 
         last_selected_item = self.selected_items[-1]
         self._mark_last_operated_item(last_selected_item)
-        last_selected_data = self._tree_row_data[last_selected_item]
-        last_selected_row_number = (
-            self._tree_row_positions.get(last_selected_item)
-            if self.localMode
-            else self.current_page * self.page_size + self.tree.index(last_selected_item) + 1
-        )
         if self.localMode:
             row_numbers = sorted(
                 (self._tree_row_positions[item] for item in self.selected_items),
@@ -2296,7 +2283,8 @@ class DeviceCheckApp:
         template_path = filedialog.askopenfilename(
             title="选择Word模板",
             filetypes=[("Word文档", "*.docx"), ("所有文件", "*.*")],
-            initialfile=TEMPLATE_DEFAULT_PATH,
+            initialdir=APPLICATION_DIR,
+            initialfile=os.path.basename(TEMPLATE_DEFAULT_PATH),
         )
         if not template_path:
             return
